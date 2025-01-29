@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+
+<body>
+
+  <button onclick="getLocation()">Try It</button>
+
+  <p id="demo"></p>
+
+  <script>
+    const x = document.getElementById("demo");
+
+    function getLocation() {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(showPosition);
+      } else {
+        x.innerHTML = "Geolocation is not supported by this browser.";
+      }
+    }
+
+    function showPosition(position) {
+      x.innerHTML = "Latitude: " + position.coords.latitude +
+        "<br>Longitude: " + position.coords.longitude;
+    }
+    if ("geolocation" in navigator) {
+      const watchId = navigator.geolocation.watchPosition(
+        (position) => {
+          const latitude = position.coords.latitude;
+          const longitude = position.coords.longitude;
+          // Handle the new position (e.g., update a map, display coordinates)
+          console.log("Latitude:", latitude, "Longitude:", longitude);
+        },
+        (error) => {
+          console.error("Error getting location:", error.message);
+        },
+        {
+          enableHighAccuracy: true, // Request more accurate location (may use more battery)
+          timeout: 10000,          // Maximum time to wait for a position (in milliseconds)
+          maximumAge: 0            // Don't use cached location data
+        }
+      );
+      // To stop listening for changes:
+      // navigator.geolocation.clearWatch(watchId);
+    } else {
+      console.error("Geolocation is not supported by this browser.");
+    }
+  </script>
+
+</body>
+
+</html>

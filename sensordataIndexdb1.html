@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html>
+
+<body>
+
+  <button onclick="start1()">Start</button>
+  <button onclick="stop1()">Stop</button>
+  <button onclick="deleteData()">Delete Data</button>
+
+  <p id="demo"></p>
+  <p id="device-info"></p>
+
+  <script>
+    const x = document.getElementById("demo");
+    const deviceInfo = document.getElementById("device-info");
+    let watchId = null;
+    let db;
+
+    // Log device information
+    deviceInfo.innerHTML = "Device Info: " + window.navigator.userAgent;
+
+    // Open or create IndexedDB database
+    const request = indexedDB.open("GeoLocationDB", 1);
+
+    request.onupgradeneeded = function(event) {
+      db = event.target.result;
+      if (!db.objectStoreNames.contains("locations")) {
+        db.createObjectStore("locations", { keyPath: "id", autoIncrement: true });
+      }
+    };
+
+    request.onsuccess = function(event) {
+      db = event.target.result;
+      console.log("Database opened successfully");
+    };
+
+    request.onerror = function(event) {
+      console.error("Error opening database:", event.target.error);
+    };
+
+    function start1() {
+      if ("geolocation" in navigator) {
+        watchId = navigator.geolocation.watchPosition(
+          (position) => {
+            const latitude = position.coords.latitude;
+            const longitude = position.coords.longitude;
+            // Handle the new position (e.g., update a map, display coordinates)
+            console.log("Latitude:", latitude, "Longitude:", longitude);
+            x.innerHTML = "Latitude: " + latitude +
+              "<br>Longitude: " + longitude;
+
+            // Store the location in IndexedDB
+            storeLocation(latitude, longitude);
+          },
+          (error) => {
+            console.error("Error getting location:", error.message);
+          },
+          {
+            enableHighAccuracy: true, 
+            timeout: 10000,          
+            maximumAge: 0            
+          }
+        );
+      } else {
+        console.error("Geolocation is not supported by this browser.");
+      }
+    }
+
+    function stop1() {
+      if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+        watchId = null;
+        x.innerHTML = "GPS stopped";
+        console.log("GPS stopped.");
+      }
+    }
+
+    function storeLocation(latitude, longitude) {
+      const transaction = db.transaction(["locations"], "readwrite");
+      const store = transaction.objectStore("locations");
+      const location = {
+        latitude: latitude,
+        longitude: longitude,
+        timestamp: new Date(),
+        deviceInfo: window.navigator.userAgent // Store device info with location
+      };
+
+      const request = store.add(location);
+
+      request.onsuccess = function() {
+        console.log("Location stored in IndexedDB");
+      };
+
+      request.onerror = function(event) {
+        console.error("Error storing location:", event.target.error);
+      };
+    }
+
+    function deleteData() {
+      const transaction = db.transaction(["locations"], "readwrite");
+      const store = transaction.objectStore("locations");
+      const request = store.clear(); // Clear all data in the "locations" store
+
+      request.onsuccess = function() {
+        console.log("All data deleted from IndexedDB");
+        alert("All data deleted from IndexedDB");
+      };
+
+      request.onerror = function(event) {
+        console.error("Error deleting data:", event.target.error);
+      };
+    }
+  </script>
+
+</body>
+
+</html>

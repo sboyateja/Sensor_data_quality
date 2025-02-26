@@ -22,7 +22,7 @@
     let watchId = null;
     let db;
 
-    const request = indexedDB.open("GeoLoacation_SensorDB", 1);
+    const request = indexedDB.open("GeoLocation_SensorDB", 1);
 
     request.onupgradeneeded = function(event) {
       db = event.target.result;

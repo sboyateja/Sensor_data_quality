@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html>
+<body>
+  <button onclick="start1()">Start</button>
+  <button onclick="stop1()">Stop</button>
+  <button onclick="deleteData()">Delete Data</button>
+
+  <h3>Live Location Data</h3>
+  <table border="1">
+    <tr>
+      <th>Id</th>
+      <th>Latitude</th>
+      <th>Longitude</th>
+      <th>Timestamp</th>
+      <th>Device Info</th>
+    </tr>
+    <tbody id="data-table"></tbody>
+  </table>
+
+  <script>
+    const dataTable = document.getElementById("data-table");
+    let watchId = null;
+    let db;
+
+    const request = indexedDB.open("GeoLoacation_SensorDB", 1);
+
+    request.onupgradeneeded = function(event) {
+      db = event.target.result;
+      if (!db.objectStoreNames.contains("locations")) {
+        db.createObjectStore("locations", { keyPath: "id", autoIncrement: true });
+      }
+    };
+
+    request.onsuccess = function(event) {
+      db = event.target.result;
+      console.log("Database opened successfully");
+      loadStoredLocations();
+    };
+
+    request.onerror = function(event) {
+      console.error("Error opening database:", event.target.error);
+    };
+
+    function start1() {
+      if ("geolocation" in navigator) {
+        watchId = navigator.geolocation.watchPosition(
+          (position) => {
+            const latitude = position.coords.latitude;
+            const longitude = position.coords.longitude;
+            const timestamp = new Date().toLocaleString();
+            const deviceInfo = window.navigator.userAgent;
+            
+            storeLocation(latitude, longitude, timestamp, deviceInfo);
+          },
+          (error) => {
+            console.error("Error getting location:", error.message);
+          },
+          {
+            enableHighAccuracy: true, 
+            timeout: 1000,          
+            maximumAge: 0            
+          }
+        );
+      } else {
+        console.error("Geolocation is not supported by this browser.");
+      }
+    }
+
+    function stop1() {
+      if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+        watchId = null;
+        console.log("GPS stopped.");
+      }
+    }
+
+    function storeLocation(latitude, longitude, timestamp, deviceInfo) {
+      if (!db) {
+        console.error("Database not ready.");
+        return;
+      }
+      const transaction = db.transaction(["locations"], "readwrite");
+      const store = transaction.objectStore("locations");
+      const location = { latitude, longitude, timestamp, deviceInfo };
+      store.add(location);
+
+      transaction.oncomplete = function() {
+        updateDisplay();
+      };
+    }
+
+    function updateDisplay() {
+      if (!db) {
+        console.error("Database not ready.");
+        return;
+      }
+      dataTable.innerHTML = "";
+      const transaction = db.transaction(["locations"], "readonly");
+      const store = transaction.objectStore("locations");
+      const request = store.openCursor();
+      
+      request.onsuccess = function(event) {
+        const cursor = event.target.result;
+        if (cursor) {
+          const row = `<tr>
+                        <td>${cursor.value.id}</td>
+                        <td>${cursor.value.latitude}</td>
+                        <td>${cursor.value.longitude}</td>
+                        <td>${cursor.value.timestamp}</td>
+                        <td>${cursor.value.deviceInfo}</td>
+                      </tr>`;
+          dataTable.innerHTML += row;
+          cursor.continue();
+        }
+      };
+    }
+
+    function loadStoredLocations() {
+      updateDisplay();
+    }
+
+    function deleteData() {
+      if (!db) {
+        console.error("Database not ready.");
+        return;
+      }
+      const transaction = db.transaction(["locations"], "readwrite");
+      const store = transaction.objectStore("locations");
+      const request = store.clear();
+
+      request.onsuccess = function() {
+        console.log("All data deleted from IndexedDB");
+        alert("All data deleted from IndexedDB");
+        dataTable.innerHTML = "";
+      };
+
+      request.onerror = function(event) {
+        console.error("Error deleting data:", event.target.error);
+      };
+    }
+  </script>
+</body>
+</html>

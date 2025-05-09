@@ -2,7 +2,7 @@
 <html>
 <head>
   <title>Live GPS Logger</title>
-  <link rel="icon" href="data:,"> <!-- prevent favicon 404 -->
+  <link rel="icon" href="data:,">
 </head>
 <body>
   <button onclick="start1()">Start</button>
@@ -35,7 +35,6 @@
     }
 
     const request = indexedDB.open("LocationLoggerDB", 1);
-
     request.onupgradeneeded = function(event) {
       db = event.target.result;
       if (!db.objectStoreNames.contains("LiveGPSData")) {
@@ -82,8 +81,8 @@
       if (watchId !== null) {
         navigator.geolocation.clearWatch(watchId);
         watchId = null;
-        console.log("GPS stopped.");
         currentTripId = null;
+        console.log("GPS stopped.");
       }
     }
 
@@ -180,8 +179,7 @@
             };
           } else {
             const errText = await response.text();
-            alert("Failed to sync data. Server said: " + errText);
-            console.error(errText);
+            alert("Failed to sync: " + errText);
           }
         } catch (error) {
           alert("Sync error: " + error.message);

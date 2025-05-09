@@ -2,6 +2,7 @@
 <html>
 <head>
   <title>Live GPS Logger</title>
+  <link rel="icon" href="data:,"> <!-- prevent favicon 404 -->
 </head>
 <body>
   <button onclick="start1()">Start</button>
@@ -178,7 +179,9 @@
               updateDisplay();
             };
           } else {
-            alert("Failed to sync data.");
+            const errText = await response.text();
+            alert("Failed to sync data. Server said: " + errText);
+            console.error(errText);
           }
         } catch (error) {
           alert("Sync error: " + error.message);

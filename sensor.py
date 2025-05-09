@@ -4,21 +4,23 @@ from pymongo import MongoClient
 import os
 
 app = Flask(__name__)
-CORS(app)  # Enables CORS globally
+CORS(app)  # Enables CORS globally for all routes
 
 # MongoDB connection
 client = MongoClient("mongodb+srv://i40:dbms2@cluster0.lixbqmp.mongodb.net/")
 db = client["sensorapp"]
 collection = db["sensordata"]
 
+# Serve the frontend HTML
 @app.route('/')
 def serve_index():
     return send_from_directory('.', 'index.html')
 
+# Sync endpoint with CORS preflight support
 @app.route('/mongodb/post', methods=['POST', 'OPTIONS'])
 def post_gps_data():
     if request.method == 'OPTIONS':
-        # CORS preflight handling
+        # Handle CORS preflight request
         response = make_response()
         response.headers['Access-Control-Allow-Origin'] = '*'
         response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
@@ -28,16 +30,21 @@ def post_gps_data():
     try:
         data = request.get_json(force=True)
         if not data:
-            return jsonify({"error": "No data received"}), 400
+            response = jsonify({"error": "No data received"})
+            response.headers['Access-Control-Allow-Origin'] = '*'
+            return response, 400
 
-        # Normalize input
         docs = [data] if isinstance(data, dict) else data if isinstance(data, list) else None
         if docs is None:
-            return jsonify({"error": "Invalid JSON format"}), 400
+            response = jsonify({"error": "Invalid JSON format"})
+            response.headers['Access-Control-Allow-Origin'] = '*'
+            return response, 400
 
         unsynced_docs = [doc for doc in docs if not doc.get("synced", False)]
         if not unsynced_docs:
-            return jsonify({"message": "All data already synced."}), 200
+            response = jsonify({"message": "All data already synced."})
+            response.headers['Access-Control-Allow-Origin'] = '*'
+            return response, 200
 
         for doc in unsynced_docs:
             doc.pop("synced", None)
@@ -54,6 +61,7 @@ def post_gps_data():
         response.headers['Access-Control-Allow-Origin'] = '*'
         return response, 500
 
+# Bind to correct port for Render
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(debug=True, host="0.0.0.0", port=port)

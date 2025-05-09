@@ -140,7 +140,7 @@ function syncData() {
     }
 
     try {
-      const response = await fetch("http://127.0.0.1:5000/mongodb/post", {
+      const response = await fetch("mongodb+srv://i40:dbms2@cluster0.lixbqmp.mongodb.net/post", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"

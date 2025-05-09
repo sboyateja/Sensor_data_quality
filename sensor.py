@@ -1,19 +1,18 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from pymongo import MongoClient
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
 
-#client = MongoClient("mongodb://localhost:27017/")
 # MongoDB connection
 client = MongoClient("mongodb+srv://i40:dbms2@cluster0.lixbqmp.mongodb.net/")
 db = client["sensorapp"]
 collection = db["sensordata"]
 
 @app.route('/')
-def index():
-    return "Flask server is running."
+def serve_index():
+    return send_from_directory('.', 'index.html')  # serves index.html if you want frontend on same server
 
 @app.route('/mongodb/post', methods=['POST'])
 def post_gps_data():
@@ -22,6 +21,7 @@ def post_gps_data():
         if not data:
             return jsonify({"error": "No data received"}), 400
 
+        # Ensure data is a list of documents
         docs = [data] if isinstance(data, dict) else data if isinstance(data, list) else None
         if docs is None:
             return jsonify({"error": "Invalid JSON format"}), 400

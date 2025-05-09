@@ -5,7 +5,8 @@ from pymongo import MongoClient
 app = Flask(__name__)
 CORS(app)
 
-# Connect to MongoDB Atlas
+#client = MongoClient("mongodb://localhost:27017/")
+# MongoDB connection
 client = MongoClient("mongodb+srv://i40:dbms2@cluster0.lixbqmp.mongodb.net/")
 db = client["sensorapp"]
 collection = db["sensordata"]
@@ -31,7 +32,7 @@ def post_gps_data():
             return jsonify({"message": "All data already synced."}), 200
 
         for doc in unsynced_docs:
-            doc.pop("synced", None)
+            doc.pop("synced", None)  # Remove synced flag before inserting
 
         result = collection.insert_many(unsynced_docs)
         inserted_ids = [str(_id) for _id in result.inserted_ids]

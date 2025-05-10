@@ -29,6 +29,8 @@
     let watchId = null;
     let db;
     let currentTripId = null;
+    let lastPosition = null;
+    let stationaryThreshold = 0.5; // 0.5 meters
 
     function generateTripId() {
       return 'trip-' + Date.now();
@@ -52,29 +54,59 @@
       console.error("Error opening database:", event.target.error);
     };
 
+    function getDistanceFromLatLonInMeters(lat1, lon1, lat2, lon2) {
+      const R = 6371000; // Radius of Earth in meters
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return R * c;
+    }
+
     function start1() {
-      if ("geolocation" in navigator) {
-        currentTripId = generateTripId();
-        watchId = navigator.geolocation.watchPosition(
-          (position) => {
-            const latitude = position.coords.latitude;
-            const longitude = position.coords.longitude;
-            const timestamp = new Date().toLocaleString();
-            const deviceInfo = navigator.userAgent;
-            storeLocation(latitude, longitude, timestamp, deviceInfo, currentTripId);
-          },
-          (error) => {
-            console.error("Error getting location:", error.message);
-          },
-          {
-            enableHighAccuracy: true,
-            timeout: 1000,
-            maximumAge: 0
-          }
-        );
-      } else {
+      if (!("geolocation" in navigator)) {
         alert("Geolocation not supported by this browser.");
+        return;
       }
+
+      currentTripId = generateTripId();
+      lastPosition = null;
+
+      watchId = navigator.geolocation.watchPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          const timestamp = new Date().toLocaleString();
+          const deviceInfo = navigator.userAgent;
+
+          if (lastPosition) {
+            const distance = getDistanceFromLatLonInMeters(
+              lastPosition.latitude,
+              lastPosition.longitude,
+              latitude,
+              longitude
+            );
+
+            if (distance < stationaryThreshold) {
+              console.log("Stationary (< 0.5m). Skipping log.");
+              return;
+            }
+          }
+
+          lastPosition = { latitude, longitude };
+          storeLocation(latitude, longitude, timestamp, deviceInfo, currentTripId);
+        },
+        (error) => {
+          console.error("Error getting location:", error.message);
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 1000,
+          maximumAge: 0
+        }
+      );
     }
 
     function stop1() {
@@ -82,6 +114,7 @@
         navigator.geolocation.clearWatch(watchId);
         watchId = null;
         currentTripId = null;
+        lastPosition = null;
         console.log("GPS stopped.");
       }
     }
@@ -158,9 +191,7 @@
         try {
           const response = await fetch("https://sensor1-b6ox.onrender.com/mongodb/post", {
             method: "POST",
-            headers: {
-              "Content-Type": "application/json"
-            },
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify(unsyncedData)
           });
 

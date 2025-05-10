@@ -30,7 +30,7 @@
     let db;
     let currentTripId = null;
     let lastPosition = null;
-    let stationaryThreshold = 0.5; // 0.5 meters
+    let stationaryThreshold = 1; // 1 meters
 
     function generateTripId() {
       return 'trip-' + Date.now();
@@ -90,7 +90,7 @@
             );
 
             if (distance < stationaryThreshold) {
-              console.log("Stationary (< 0.5m). Skipping log.");
+              console.log("Stationary (< 1 m). Skipping log.");
               return;
             }
           }

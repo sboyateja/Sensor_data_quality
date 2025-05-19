@@ -6,99 +6,94 @@
   <link rel="icon" href="data:,">
   <style>
     body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background: #f4f6f9;
-      margin: 20px;
-      padding: 20px;
-      color: #333;
-    }
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: #f4f6f9;
+    margin: 20px;
+    padding: 20px;
+    color: #333;
+  }
 
-    h3 {
-      margin-top: 30px;
-      font-size: 22px;
-      color: #2c3e50;
-    }
+  h3 {
+    margin-top: 30px;
+    font-size: 22px;
+    color: #2c3e50;
+  }
 
-    button {
-      background-color: #3498db;
-      color: white;
-      border: none;
-      padding: 10px 16px;
-      margin: 5px 8px 15px 0;
-      border-radius: 6px;
-      font-size: 14px;
-      cursor: pointer;
-      transition: background-color 0.2s ease;
-    }
+  #statusMsg {
+    margin: 10px 0;
+    font-weight: bold;
+  }
 
-    button:hover {
-      background-color: #2980b9;
+  button {
+    background-color: #3498db;
+    color: white;
+    border: none;
+    padding: 12px 18px;
+    margin: 6px 10px 16px 0;
+    border-radius: 8px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    min-width: 120px;
+  }
+
+  button:hover {
+    background-color: #2980b9;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    background-color: white;
+    margin-top: 10px;
+    border-radius: 10px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    overflow: hidden;
+  }
+
+  th, td {
+    padding: 14px 16px;
+    text-align: left;
+    border-bottom: 1px solid #e0e0e0;
+    font-size: 14px;
+  }
+
+  th {
+    background-color: #f7f9fc;
+    color: #34495e;
+    font-weight: bold;
+  }
+
+  tr:hover {
+    background-color: #f0f8ff;
+  }
+
+  td {
+    color: #555;
+  }
+
+  @media screen and (max-width: 768px) {
+    body {
+      padding: 10px;
+      margin: 10px;
     }
 
     table {
+      display: block;
+      overflow-x: auto;
+      white-space: nowrap;
+    }
+
+    button {
       width: 100%;
-      border-collapse: collapse;
-      background-color: white;
-      margin-top: 10px;
-      border-radius: 8px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-      overflow: hidden;
+      margin-bottom: 10px;
+      font-size: 16px;
     }
 
-    th, td {
-      padding: 14px 16px;
-      text-align: left;
-      border-bottom: 1px solid #e0e0e0;
-      font-size: 14px;
+    h3 {
+      font-size: 20px;
     }
-
-    th {
-      background-color: #f7f9fc;
-      color: #34495e;
-      font-weight: bold;
-    }
-
-    tr:hover {
-      background-color: #f0f8ff;
-    }
-
-    td {
-      color: #555;
-    }
-
-    @media screen and (max-width: 768px) {
-      table, thead, tbody, th, td, tr {
-        display: block;
-      }
-
-      thead {
-        display: none;
-      }
-
-      tr {
-        margin-bottom: 15px;
-        border: 1px solid #ddd;
-        border-radius: 6px;
-        padding: 10px;
-        background: white;
-      }
-
-      td {
-        text-align: right;
-        position: relative;
-        padding-left: 50%;
-      }
-
-      td::before {
-        content: attr(data-label);
-        position: absolute;
-        left: 16px;
-        top: 14px;
-        font-weight: bold;
-        color: #333;
-        text-align: left;
-      }
-    }
+  }
   </style>
 </head>
 <body>

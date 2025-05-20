@@ -12,18 +12,15 @@
       padding: 20px;
       color: #333;
     }
-
     h3 {
       margin-top: 30px;
       font-size: 22px;
       color: #2c3e50;
     }
-
     #statusMsg {
       margin: 10px 0;
       font-weight: bold;
     }
-
     button {
       background-color: #3498db;
       color: white;
@@ -36,11 +33,9 @@
       transition: background-color 0.2s ease;
       min-width: 120px;
     }
-
     button:hover {
       background-color: #2980b9;
     }
-
     table {
       width: 100%;
       border-collapse: collapse;
@@ -50,46 +45,38 @@
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
       overflow: hidden;
     }
-
     th, td {
       padding: 14px 16px;
       text-align: left;
       border-bottom: 1px solid #e0e0e0;
       font-size: 14px;
     }
-
     th {
       background-color: #f7f9fc;
       color: #34495e;
       font-weight: bold;
     }
-
     tr:hover {
       background-color: #f0f8ff;
     }
-
     td {
       color: #555;
     }
-
     @media screen and (max-width: 768px) {
       body {
         padding: 10px;
         margin: 10px;
       }
-
       table {
         display: block;
         overflow-x: auto;
         white-space: nowrap;
       }
-
       button {
         width: 100%;
         margin-bottom: 10px;
         font-size: 16px;
       }
-
       h3 {
         font-size: 20px;
       }
@@ -127,6 +114,9 @@
     let db;
     let currentTripId = null;
     let lastPosition = null;
+    let tripStartTime = null;
+    let cumulativeMeters = 0;
+    let cumulativeSeconds = 0;
     let stationaryThreshold = 1; // meters
 
     function generateTripId() {
@@ -172,34 +162,30 @@
 
       currentTripId = generateTripId();
       lastPosition = null;
+      tripStartTime = null;
+      cumulativeMeters = 0;
+      cumulativeSeconds = 0;
 
       watchId = navigator.geolocation.watchPosition(
         (position) => {
           const { latitude, longitude } = position.coords;
-          const now = new Date();
-          const timestamp = now.toLocaleString();
+          const timestamp = new Date().toLocaleString();
           const deviceInfo = navigator.userAgent;
 
-          let distance = 0;
-          let seconds = 0;
-
           if (lastPosition) {
-            distance = getDistanceFromLatLonInMeters(
+            const distance = getDistanceFromLatLonInMeters(
               lastPosition.latitude,
               lastPosition.longitude,
               latitude,
               longitude
             );
-            seconds = Math.round((now - lastPosition.timestampObj) / 1000);
-
             if (distance < stationaryThreshold) {
               console.log("Stationary (< 1 m). Skipping log.");
               return;
             }
           }
 
-          storeLocation(latitude, longitude, timestamp, deviceInfo, currentTripId, distance, seconds);
-          lastPosition = { latitude, longitude, timestampObj: now };
+          storeLocation(latitude, longitude, timestamp, deviceInfo, currentTripId);
         },
         (error) => {
           console.error("Error getting location:", error.message);
@@ -218,13 +204,33 @@
         watchId = null;
         currentTripId = null;
         lastPosition = null;
-        console.log("GPS stopped.");
+        tripStartTime = null;
+        cumulativeMeters = 0;
+        cumulativeSeconds = 0;
         alert("GPS stopped.");
       }
     }
 
-    function storeLocation(latitude, longitude, timestamp, deviceInfo, tripId, meters, seconds) {
+    function storeLocation(latitude, longitude, timestamp, deviceInfo, tripId) {
       if (!db) return;
+
+      const now = new Date();
+      if (!tripStartTime) tripStartTime = now;
+
+      let distance = 0;
+      if (lastPosition) {
+        distance = getDistanceFromLatLonInMeters(
+          lastPosition.latitude,
+          lastPosition.longitude,
+          latitude,
+          longitude
+        );
+      }
+
+      cumulativeMeters += distance;
+      cumulativeSeconds = Math.round((now - tripStartTime) / 1000);
+      lastPosition = { latitude, longitude, timestampObj: now };
+
       const transaction = db.transaction(["LiveGPSData"], "readwrite");
       const store = transaction.objectStore("LiveGPSData");
 
@@ -235,8 +241,8 @@
         deviceInfo,
         tripId,
         synced: false,
-        meters: meters || 0,
-        seconds: seconds || 0
+        meters: cumulativeMeters,
+        seconds: cumulativeSeconds
       };
 
       store.add(location);

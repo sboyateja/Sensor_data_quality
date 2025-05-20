@@ -281,28 +281,45 @@
       updateDisplay();
     }
 
-    function deleteData() {
-      if (!db) return;
+function deleteData() {
+  if (!db) return;
 
-      const confirmDelete = confirm("Are you sure you want to delete all location data?");
-      if (!confirmDelete) {
-        alert("Data deletion cancelled.");
-        return;
-      }
+  const confirmDelete = confirm("Are you sure you want to delete all location data?");
+  if (!confirmDelete) {
+    alert("Data deletion cancelled.");
+    return;
+  }
 
-      const transaction = db.transaction(["LiveGPSData"], "readwrite");
-      const store = transaction.objectStore("LiveGPSData");
-      const request = store.clear();
+  // Close the current DB connection
+  db.close();
 
-      request.onsuccess = function() {
-        alert("All data deleted from IndexedDB");
-        dataTable.innerHTML = "";
-      };
+  // Delete the entire database
+  const deleteRequest = indexedDB.deleteDatabase("LocationLoggerDB");
 
-      request.onerror = function(event) {
-        console.error("Error deleting data:", event.target.error);
-      };
-    }
+  deleteRequest.onsuccess = function() {
+    console.log("Database deleted successfully");
+
+    // Reopen the database, which will recreate it with a fresh store
+    const request = indexedDB.open("LocationLoggerDB", 1);
+    request.onupgradeneeded = function(event) {
+      db = event.target.result;
+      db.createObjectStore("LiveGPSData", { keyPath: "id", autoIncrement: true });
+    };
+    request.onsuccess = function(event) {
+      db = event.target.result;
+      alert("All data deleted and ID reset to 1");
+      dataTable.innerHTML = "";
+    };
+    request.onerror = function(event) {
+      console.error("Reopening database failed:", event.target.error);
+    };
+  };
+
+  deleteRequest.onerror = function(event) {
+    console.error("Error deleting database:", event.target.error);
+  };
+}
+
 
     function syncData() {
       if (!db) return;

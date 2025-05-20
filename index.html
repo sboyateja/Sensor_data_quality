@@ -199,17 +199,47 @@
     }
 
     function stop1() {
-      if (watchId !== null) {
-        navigator.geolocation.clearWatch(watchId);
-        watchId = null;
-        currentTripId = null;
-        lastPosition = null;
-        tripStartTime = null;
-        cumulativeMeters = 0;
-        cumulativeSeconds = 0;
-        alert("GPS stopped.");
-      }
+  if (watchId !== null) {
+    navigator.geolocation.clearWatch(watchId);
+    watchId = null;
+
+    const tripIdToUpdate = currentTripId; // Save the current trip ID before resetting
+    const userNote = prompt("Enter any important notes for this trip:");
+
+    if (db && tripIdToUpdate && userNote !== null) {
+      const transaction = db.transaction(["LiveGPSData"], "readwrite");
+      const store = transaction.objectStore("LiveGPSData");
+
+      const request = store.openCursor();
+      request.onsuccess = function(event) {
+        const cursor = event.target.result;
+        if (cursor) {
+          const value = cursor.value;
+          if (value.tripId === tripIdToUpdate) {
+            value.notes = userNote;
+            cursor.update(value);
+          }
+          cursor.continue();
+        }
+      };
+
+      transaction.oncomplete = () => {
+        alert("Notes added and GPS stopped.");
+        updateDisplay();
+      };
+    } else {
+      alert("GPS stopped.");
     }
+
+    // Reset trip state
+    currentTripId = null;
+    lastPosition = null;
+    tripStartTime = null;
+    cumulativeMeters = 0;
+    cumulativeSeconds = 0;
+  }
+}
+
 
     function storeLocation(latitude, longitude, timestamp, deviceInfo, tripId) {
       if (!db) return;

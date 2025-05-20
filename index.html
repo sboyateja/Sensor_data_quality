@@ -309,23 +309,45 @@
       };
     }
 
-    function updateNote(id, newNote) {
-      const transaction = db.transaction(["LiveGPSData"], "readwrite");
-      const store = transaction.objectStore("LiveGPSData");
-      const request = store.get(id);
+function updateNote(id, newNote) {
+  const transaction = db.transaction(["LiveGPSData"], "readwrite");
+  const store = transaction.objectStore("LiveGPSData");
+  const getRequest = store.get(id);
 
-      request.onsuccess = function(event) {
-        const data = event.target.result;
-        if (data) {
-          data.notes = newNote;
-          store.put(data);
+  getRequest.onsuccess = function(event) {
+    const data = event.target.result;
+    if (data) {
+      const tripIdToUpdate = data.tripId;
+
+      // Now update all records with this tripId
+      const cursorRequest = store.openCursor();
+      cursorRequest.onsuccess = function(e) {
+        const cursor = e.target.result;
+        if (cursor) {
+          const value = cursor.value;
+          if (value.tripId === tripIdToUpdate) {
+            value.notes = newNote;
+            cursor.update(value);
+          }
+          cursor.continue();
         }
       };
 
-      request.onerror = function(event) {
-        console.error("Failed to retrieve record for updating:", event.target.error);
+      cursorRequest.onerror = function(e) {
+        console.error("Error updating notes for trip:", e.target.error);
       };
     }
+  };
+
+  getRequest.onerror = function(event) {
+    console.error("Failed to retrieve record for updating:", event.target.error);
+  };
+
+  transaction.oncomplete = function() {
+    updateDisplay();
+  };
+}
+
 
     function loadStoredLocations() {
       updateDisplay();

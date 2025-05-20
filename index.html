@@ -6,94 +6,94 @@
   <link rel="icon" href="data:,">
   <style>
     body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: #f4f6f9;
-    margin: 20px;
-    padding: 20px;
-    color: #333;
-  }
-
-  h3 {
-    margin-top: 30px;
-    font-size: 22px;
-    color: #2c3e50;
-  }
-
-  #statusMsg {
-    margin: 10px 0;
-    font-weight: bold;
-  }
-
-  button {
-    background-color: #3498db;
-    color: white;
-    border: none;
-    padding: 12px 18px;
-    margin: 6px 10px 16px 0;
-    border-radius: 8px;
-    font-size: 16px;
-    cursor: pointer;
-    transition: background-color 0.2s ease;
-    min-width: 120px;
-  }
-
-  button:hover {
-    background-color: #2980b9;
-  }
-
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    background-color: white;
-    margin-top: 10px;
-    border-radius: 10px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-    overflow: hidden;
-  }
-
-  th, td {
-    padding: 14px 16px;
-    text-align: left;
-    border-bottom: 1px solid #e0e0e0;
-    font-size: 14px;
-  }
-
-  th {
-    background-color: #f7f9fc;
-    color: #34495e;
-    font-weight: bold;
-  }
-
-  tr:hover {
-    background-color: #f0f8ff;
-  }
-
-  td {
-    color: #555;
-  }
-
-  @media screen and (max-width: 768px) {
-    body {
-      padding: 10px;
-      margin: 10px;
-    }
-
-    table {
-      display: block;
-      overflow-x: auto;
-      white-space: nowrap;
-    }
-
-    button {
-      width: 100%;
-      margin-bottom: 10px;
-      font-size: 16px;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #f4f6f9;
+      margin: 20px;
+      padding: 20px;
+      color: #333;
     }
 
     h3 {
-      font-size: 20px;
+      margin-top: 30px;
+      font-size: 22px;
+      color: #2c3e50;
     }
-  }
+
+    #statusMsg {
+      margin: 10px 0;
+      font-weight: bold;
+    }
+
+    button {
+      background-color: #3498db;
+      color: white;
+      border: none;
+      padding: 12px 18px;
+      margin: 6px 10px 16px 0;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: background-color 0.2s ease;
+      min-width: 120px;
+    }
+
+    button:hover {
+      background-color: #2980b9;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background-color: white;
+      margin-top: 10px;
+      border-radius: 10px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+      overflow: hidden;
+    }
+
+    th, td {
+      padding: 14px 16px;
+      text-align: left;
+      border-bottom: 1px solid #e0e0e0;
+      font-size: 14px;
+    }
+
+    th {
+      background-color: #f7f9fc;
+      color: #34495e;
+      font-weight: bold;
+    }
+
+    tr:hover {
+      background-color: #f0f8ff;
+    }
+
+    td {
+      color: #555;
+    }
+
+    @media screen and (max-width: 768px) {
+      body {
+        padding: 10px;
+        margin: 10px;
+      }
+
+      table {
+        display: block;
+        overflow-x: auto;
+        white-space: nowrap;
+      }
+
+      button {
+        width: 100%;
+        margin-bottom: 10px;
+        font-size: 16px;
+      }
+
+      h3 {
+        font-size: 20px;
+      }
+    }
   </style>
 </head>
 <body>
@@ -176,24 +176,30 @@
       watchId = navigator.geolocation.watchPosition(
         (position) => {
           const { latitude, longitude } = position.coords;
-          const timestamp = new Date().toLocaleString();
+          const now = new Date();
+          const timestamp = now.toLocaleString();
           const deviceInfo = navigator.userAgent;
 
+          let distance = 0;
+          let seconds = 0;
+
           if (lastPosition) {
-            const distance = getDistanceFromLatLonInMeters(
+            distance = getDistanceFromLatLonInMeters(
               lastPosition.latitude,
               lastPosition.longitude,
               latitude,
               longitude
             );
+            seconds = Math.round((now - lastPosition.timestampObj) / 1000);
+
             if (distance < stationaryThreshold) {
               console.log("Stationary (< 1 m). Skipping log.");
               return;
             }
           }
 
-          lastPosition = { latitude, longitude };
-          storeLocation(latitude, longitude, timestamp, deviceInfo, currentTripId);
+          storeLocation(latitude, longitude, timestamp, deviceInfo, currentTripId, distance, seconds);
+          lastPosition = { latitude, longitude, timestampObj: now };
         },
         (error) => {
           console.error("Error getting location:", error.message);
@@ -217,29 +223,25 @@
       }
     }
 
-    function storeLocation(latitude, longitude, timestamp, deviceInfo, tripId) {
+    function storeLocation(latitude, longitude, timestamp, deviceInfo, tripId, meters, seconds) {
       if (!db) return;
-      
-      const now = new Date();
-      let distance = 0;
-      let seconds = 0;
-      if (lastPosition) {
-        distance = getDistanceFromLatLonInMeters(
-          lastPosition.latitude,
-          lastPosition.longitude,
-          latitude,
-          longitude
-        );
-       seconds = Math.round((now - lastPosition.timestampObj) / 1000);
-      }
-      lastPosition = { latitude, longitude, timestampObj: now };
       const transaction = db.transaction(["LiveGPSData"], "readwrite");
       const store = transaction.objectStore("LiveGPSData");
-      const location = { latitude, longitude, timestamp, deviceInfo, tripId, synced: false, meters: distance, seconds };
+
+      const location = {
+        latitude,
+        longitude,
+        timestamp,
+        deviceInfo,
+        tripId,
+        synced: false,
+        meters: meters || 0,
+        seconds: seconds || 0
+      };
+
       store.add(location);
       transaction.oncomplete = updateDisplay;
-}
-
+    }
 
     function updateDisplay() {
       if (!db) return;
@@ -253,16 +255,16 @@
         if (cursor) {
           const value = cursor.value;
           const row = `<tr>
-         <td data-label="Id">${value.id}</td>
-         <td data-label="Latitude">${value.latitude}</td>
-         <td data-label="Longitude">${value.longitude}</td>
-         <td data-label="Timestamp">${value.timestamp}</td>
-         <td data-label="Device Info">${value.deviceInfo}</td>
-         <td data-label="Trip ID">${value.tripId || "-"}</td>
-         <td data-label="Meters">${value.meters?.toFixed(2) || "-"}</td>
-         <td data-label="Seconds">${value.seconds || "-"}</td>
-         <td data-label="Synced">${value.synced ? "True" : "False"}</td>
-         </tr>`;
+            <td>${value.id}</td>
+            <td>${value.latitude}</td>
+            <td>${value.longitude}</td>
+            <td>${value.timestamp}</td>
+            <td>${value.deviceInfo}</td>
+            <td>${value.tripId || "-"}</td>
+            <td>${value.meters?.toFixed(2) || "-"}</td>
+            <td>${value.seconds || "-"}</td>
+            <td>${value.synced ? "True" : "False"}</td>
+          </tr>`;
           dataTable.innerHTML += row;
           cursor.continue();
         }
@@ -274,27 +276,27 @@
     }
 
     function deleteData() {
-  if (!db) return;
+      if (!db) return;
 
-  const confirmDelete = confirm("Are you sure you want to delete all location data?");
-  if (!confirmDelete) {
-    alert("Data deletion cancelled.");
-    return;
-  }
+      const confirmDelete = confirm("Are you sure you want to delete all location data?");
+      if (!confirmDelete) {
+        alert("Data deletion cancelled.");
+        return;
+      }
 
-  const transaction = db.transaction(["LiveGPSData"], "readwrite");
-  const store = transaction.objectStore("LiveGPSData");
-  const request = store.clear();
+      const transaction = db.transaction(["LiveGPSData"], "readwrite");
+      const store = transaction.objectStore("LiveGPSData");
+      const request = store.clear();
 
-  request.onsuccess = function() {
-    alert("All data deleted from IndexedDB");
-    dataTable.innerHTML = "";
-  };
+      request.onsuccess = function() {
+        alert("All data deleted from IndexedDB");
+        dataTable.innerHTML = "";
+      };
 
-  request.onerror = function(event) {
-    console.error("Error deleting data:", event.target.error);
-  };
-}
+      request.onerror = function(event) {
+        console.error("Error deleting data:", event.target.error);
+      };
+    }
 
     function syncData() {
       if (!db) return;

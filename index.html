@@ -113,6 +113,8 @@
         <th>Timestamp</th>
         <th>Device Info</th>
         <th>Trip ID</th>
+        <th>Meters</th>
+        <th>Seconds</th>
         <th>Synced</th>
       </tr>
     </thead>
@@ -217,12 +219,27 @@
 
     function storeLocation(latitude, longitude, timestamp, deviceInfo, tripId) {
       if (!db) return;
+      
+      const now = new Date();
+      let distance = 0;
+      let seconds = 0;
+      if (lastPosition) {
+        distance = getDistanceFromLatLonInMeters(
+          lastPosition.latitude,
+          lastPosition.longitude,
+          latitude,
+          longitude
+        );
+       seconds = Math.round((now - lastPosition.timestampObj) / 1000);
+      }
+      lastPosition = { latitude, longitude, timestampObj: now };
       const transaction = db.transaction(["LiveGPSData"], "readwrite");
       const store = transaction.objectStore("LiveGPSData");
-      const location = { latitude, longitude, timestamp, deviceInfo, tripId, synced: false };
+      const location = { latitude, longitude, timestamp, deviceInfo, tripId, synced: false, meters: distance, seconds };
       store.add(location);
       transaction.oncomplete = updateDisplay;
-    }
+}
+
 
     function updateDisplay() {
       if (!db) return;
@@ -236,14 +253,16 @@
         if (cursor) {
           const value = cursor.value;
           const row = `<tr>
-            <td data-label="Id">${value.id}</td>
-            <td data-label="Latitude">${value.latitude}</td>
-            <td data-label="Longitude">${value.longitude}</td>
-            <td data-label="Timestamp">${value.timestamp}</td>
-            <td data-label="Device Info">${value.deviceInfo}</td>
-            <td data-label="Trip ID">${value.tripId || "-"}</td>
-            <td data-label="Synced">${value.synced ? "True" : "False"}</td>
-          </tr>`;
+         <td data-label="Id">${value.id}</td>
+         <td data-label="Latitude">${value.latitude}</td>
+         <td data-label="Longitude">${value.longitude}</td>
+         <td data-label="Timestamp">${value.timestamp}</td>
+         <td data-label="Device Info">${value.deviceInfo}</td>
+         <td data-label="Trip ID">${value.tripId || "-"}</td>
+         <td data-label="Meters">${value.meters?.toFixed(2) || "-"}</td>
+         <td data-label="Seconds">${value.seconds || "-"}</td>
+         <td data-label="Synced">${value.synced ? "True" : "False"}</td>
+         </tr>`;
           dataTable.innerHTML += row;
           cursor.continue();
         }

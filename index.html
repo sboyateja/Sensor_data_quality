@@ -118,7 +118,7 @@
     let tripStartTime = null;
     let cumulativeMeters = 0;
     let cumulativeSeconds = 0;
-    let stationaryThreshold = 2;
+    let stationaryThreshold = 0.5;
 
     function generateTripId() {
       return 'trip-' + Date.now();
@@ -180,7 +180,7 @@
               longitude
             );
             if (distance < stationaryThreshold) {
-              console.log("Stationary (< 1 m). Skipping log.");
+              console.log("Stationary (< 0.5 m). Skipping log.");
               return;
             }
           }

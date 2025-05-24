@@ -282,41 +282,44 @@
       transaction.oncomplete = updateDisplay;
     }
 
-    function updateDisplay() {
-      if (!db) return;
-      dataTable.innerHTML = "";
-      const transaction = db.transaction(["LiveGPSData"], "readonly");
-      const store = transaction.objectStore("LiveGPSData");
-      const request = store.openCursor();
+function updateDisplay() {
+  if (!db) return;
+  dataTable.innerHTML = "";
+  const transaction = db.transaction(["LiveGPSData"], "readonly");
+  const store = transaction.objectStore("LiveGPSData");
+  const request = store.openCursor();
 
-      request.onsuccess = function(event) {
-        const cursor = event.target.result;
-        if (cursor) {
-          const value = cursor.value;
-          const row = `<tr>
-            <td>${value.id}</td>
-            <td>${value.latitude}</td>
-            <td>${value.longitude}</td>
-            <td>${value.timestamp}</td>
-            <td>${value.deviceInfo}</td>
-            <td>${value.tripId || "-"}</td>
-            <td>${value.meters?.toFixed(2) || "-"}</td>
-            <td>${value.seconds || "-"}</td>
-            <td>${value.synced ? "True" : "False"}</td>
-            <td><input 
-                  type="text" 
-                  id="note-${value.id}"  <!-- 🔴 Added id -->
-                  name="note-${value.id}"  <!-- 🔴 Added name -->
-                  value="${value.notes || ""}" 
-                  onchange="updateNote(${value.id}, this.value)" 
-                  style="width: 100%;" 
-                /></td>
-          </tr>`;
-          dataTable.innerHTML += row;
-          cursor.continue();
-        }
-      };
+  request.onsuccess = function(event) {
+    const cursor = event.target.result;
+    if (cursor) {
+      const value = cursor.value;
+      const row = `<tr>
+        <td>${value.id}</td>
+        <td>${value.latitude}</td>
+        <td>${value.longitude}</td>
+        <td>${value.timestamp}</td>
+        <td>${value.deviceInfo}</td>
+        <td>${value.tripId || "-"}</td>
+        <td>${value.meters?.toFixed(2) || "-"}</td>
+        <td>${value.seconds || "-"}</td>
+        <td>${value.synced ? "True" : "False"}</td>
+        <td>
+          <input 
+            type="text" 
+            id="note-${value.id}" 
+            name="note-${value.id}" 
+            value="${value.notes || ""}" 
+            onchange="updateNote(${value.id}, this.value)" 
+            style="width: 100%;" 
+          />
+        </td>
+      </tr>`;
+      dataTable.innerHTML += row;
+      cursor.continue();
     }
+  };
+}
+
 
     function updateNote(id, newNote) {
       const transaction = db.transaction(["LiveGPSData"], "readwrite");

@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>Live GPS Logger</title>
-  <link rel="icon" href="data:,">
+  <link rel="icon" href="data:," />
   <style>
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -282,46 +282,48 @@
       transaction.oncomplete = updateDisplay;
     }
 
-function updateDisplay() {
-  if (!db) return;
-  dataTable.innerHTML = "";
-  const transaction = db.transaction(["LiveGPSData"], "readonly");
-  const store = transaction.objectStore("LiveGPSData");
-  const request = store.openCursor();
+    function updateDisplay() {
+      if (!db) return;
+      dataTable.innerHTML = "";
+      const transaction = db.transaction(["LiveGPSData"], "readonly");
+      const store = transaction.objectStore("LiveGPSData");
+      const request = store.openCursor();
 
-  request.onsuccess = function(event) {
-    const cursor = event.target.result;
-    if (cursor) {
-      const value = cursor.value;
-      const row = `<tr>
-        <td>${value.id}</td>
-        <td>${value.latitude}</td>
-        <td>${value.longitude}</td>
-        <td>${value.timestamp}</td>
-        <td>${value.deviceInfo}</td>
-        <td>${value.tripId || "-"}</td>
-        <td>${value.meters?.toFixed(2) || "-"}</td>
-        <td>${value.seconds || "-"}</td>
-        <td>${value.synced ? "True" : "False"}</td>
-        <td>
-          <input 
-            type="text" 
-            id="note-${value.id}" 
-            name="note-${value.id}" 
-            value="${value.notes || ""}" 
-            onchange="updateNote(${value.id}, this.value)" 
-            style="width: 100%;" 
-          />
-        </td>
-      </tr>`;
-      dataTable.innerHTML += row;
-      cursor.continue();
+      request.onsuccess = function(event) {
+        const cursor = event.target.result;
+        if (cursor) {
+          const value = cursor.value;
+          const row = `<tr>
+            <td>${value.id}</td>
+            <td>${value.latitude}</td>
+            <td>${value.longitude}</td>
+            <td>${value.timestamp}</td>
+            <td>${value.deviceInfo}</td>
+            <td>${value.tripId || "-"}</td>
+            <td>${value.meters?.toFixed(2) || "-"}</td>
+            <td>${value.seconds || "-"}</td>
+            <td>${value.synced ? "True" : "False"}</td>
+            <td>
+              <input 
+                type="text" 
+                id="note-${value.id}" 
+                name="note-${value.id}" 
+                value="${value.notes || ""}" 
+                onchange="updateNote(${value.id}, this.value)" 
+                style="width: 100%;" 
+              />
+            </td>
+          </tr>`;
+          dataTable.innerHTML += row;
+          cursor.continue();
+        }
+      };
     }
-  };
-}
 
-
+    // Fixed updateNote function to update only the single record's notes:
     function updateNote(id, newNote) {
+      if (!db) return;
+
       const transaction = db.transaction(["LiveGPSData"], "readwrite");
       const store = transaction.objectStore("LiveGPSData");
       const getRequest = store.get(id);
@@ -329,25 +331,12 @@ function updateDisplay() {
       getRequest.onsuccess = function(event) {
         const data = event.target.result;
         if (data) {
-          const tripIdToUpdate = data.tripId;
-
-          const cursorRequest = store.openCursor();
-          cursorRequest.onsuccess = function(e) {
-            const cursor = e.target.result;
-            if (cursor) {
-              const value = cursor.value;
-              if (value.tripId === tripIdToUpdate) {
-                value.notes = newNote;
-                cursor.update(value);
-              }
-              cursor.continue();
-            }
+          data.notes = newNote;
+          const updateRequest = store.put(data);
+          updateRequest.onsuccess = () => {
+            updateDisplay();
           };
         }
-      };
-
-      transaction.oncomplete = function() {
-        updateDisplay();
       };
     }
 

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Fast GPS Logger</title>
+  <title>Fast GPS Logger with Device Info</title>
   <style>
     body { font-family: sans-serif; margin: 20px; }
     button {
@@ -45,6 +45,7 @@
         <th>Lat</th>
         <th>Lng</th>
         <th>Time</th>
+        <th>Device Info</th>
       </tr>
     </thead>
     <tbody id="logTable"></tbody>
@@ -53,6 +54,7 @@
   <script>
     let db, watchId = null;
     let tripId = Date.now();
+    const deviceInfo = navigator.userAgent;
 
     const request = indexedDB.open("FastGPS", 1);
     request.onupgradeneeded = e => {
@@ -71,7 +73,7 @@
         pos => {
           const { latitude, longitude } = pos.coords;
           const timestamp = new Date().toISOString();
-          saveLocation({ latitude, longitude, timestamp, tripId });
+          saveLocation({ latitude, longitude, timestamp, tripId, deviceInfo });
           document.getElementById('status').textContent = '';
         },
         err => {
@@ -114,8 +116,14 @@
       request.onsuccess = e => {
         const cursor = e.target.result;
         if (cursor) {
-          const { id, latitude, longitude, timestamp } = cursor.value;
-          const row = `<tr><td>${id}</td><td>${latitude}</td><td>${longitude}</td><td>${timestamp}</td></tr>`;
+          const { id, latitude, longitude, timestamp, deviceInfo } = cursor.value;
+          const row = `<tr>
+            <td>${id}</td>
+            <td>${latitude}</td>
+            <td>${longitude}</td>
+            <td>${timestamp}</td>
+            <td>${deviceInfo}</td>
+          </tr>`;
           table.innerHTML += row;
           cursor.continue();
         }

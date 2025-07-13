@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Fast GPS Logger</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 20px;
+    }
+    button {
+      padding: 12px 16px;
+      font-size: 16px;
+      margin: 6px;
+      border-radius: 6px;
+      border: none;
+      background-color: #007BFF;
+      color: white;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    #status { margin: 12px 0; color: red; font-weight: bold; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 16px;
+    }
+    th, td {
+      padding: 8px;
+      border: 1px solid #ccc;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+
+  <button onclick="startTracking()">Start</button>
+  <button onclick="stopTracking()">Stop</button>
+  <button onclick="clearData()">Clear Data</button>
+
+  <div id="status"></div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Lat</th>
+        <th>Lng</th>
+        <th>Time</th>
+      </tr>
+    </thead>
+    <tbody id="logTable"></tbody>
+  </table>
+
+  <script>
+    let db, watchId = null;
+    let tripId = Date.now();
+
+    // Setup IndexedDB
+    const request = indexedDB.open("FastGPS", 1);
+    request.onupgradeneeded = e => {
+      db = e.target.result;
+      db.createObjectStore("locations", { keyPath: "id", autoIncrement: true });
+    };
+    request.onsuccess = e => {
+      db = e.target.result;
+      loadData();
+    };
+
+    function startTracking() {
+      if (watchId !== null) return;
+
+      watchId = navigator.geolocation.watchPosition(
+        pos => {
+          const { latitude, longitude } = pos.coords;
+          const timestamp = new Date().toISOString();
+
+          saveLocation({ latitude, longitude, timestamp, tripId });
+          document.getElementById('status').textContent = '';
+        },
+        err => {
+          document.getElementById('status').textContent = `GPS error: ${err.message}`;
+          console.error("GPS error", err);
+          setTimeout(() => {
+            stopTracking(false);
+            startTracking();
+          }, 2000); // Retry
+        },
+        {
+          enableHighAccuracy: true,
+          maximumAge: 0,
+          timeout: 10000
+        }
+      );
+    }
+
+    function stopTracking(reset = true) {
+      if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+        watchId = null;
+        if (reset) tripId = Date.now();
+      }
+    }
+
+    function saveLocation(data) {
+      const tx = db.transaction("locations", "readwrite");
+      tx.objectStore("locations").add(data);
+      tx.oncomplete = loadData;
+    }
+
+    function loadData() {
+      const table = document.getElementById("logTable");
+      table.innerHTML = "";
+
+      const tx = db.transaction("locations", "readonly");
+      const store = tx.objectStore("locations");
+      const request = store.openCursor();
+
+      request.onsuccess = e => {
+        const cursor = e.target.result;
+        if (cursor) {
+          const { id, latitude, longitude, timestamp } = cursor.value;
+          const row = `<tr><td>${id}</td><td>${latitude}</td><td>${longitude}</td><td>${timestamp}</td></tr>`;
+          table.innerHTML += row;
+          cursor.continue();
+        }
+      };
+    }
+
+    function clearData() {
+      if (!confirm("Clear all location data?")) return;
+      const tx = db.transaction("locations", "readwrite");
+      tx.objectStore("locations").clear().onsuccess = () => {
+        document.getElementById("logTable").innerHTML = "";
+      };
+    }
+  </script>
+</body>
+</html>

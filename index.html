@@ -72,7 +72,7 @@
       watchId = navigator.geolocation.watchPosition(
         pos => {
           const { latitude, longitude } = pos.coords;
-          const timestamp = new Date().toISOString();
+          const timestamp = new Date();
           saveLocation({ latitude, longitude, timestamp, tripId, deviceInfo });
           document.getElementById('status').textContent = '';
         },

@@ -58,13 +58,14 @@
     let tripId = Date.now();
     const deviceInfo = navigator.userAgent;
 
+    // Open DB
     const request = indexedDB.open("FastGPS", 1);
     request.onupgradeneeded = e => {
       db = e.target.result;
       if (db.objectStoreNames.contains("locations")) {
         db.deleteObjectStore("locations");
       }
-      const store = db.createObjectStore("locations", { keyPath: "id", autoIncrement: true });
+      db.createObjectStore("locations", { keyPath: "id", autoIncrement: true });
     };
     request.onsuccess = e => {
       db = e.target.result;
@@ -108,7 +109,6 @@
       const tx = db.transaction("locations", "readwrite");
       const store = tx.objectStore("locations");
       const request = store.add(data);
-
       request.onsuccess = e => {
         const id = e.target.result;
         appendRow({ id, ...data });
@@ -150,13 +150,27 @@
     }
 
     function clearData() {
-      if (!confirm("Clear all location data?")) return;
-      const tx = db.transaction("locations", "readwrite");
-      const store = tx.objectStore("locations");
-      store.clear().onsuccess = () => {
-        document.getElementById("logTable").innerHTML = "";
-        document.getElementById("status").textContent = "Local data cleared. ID reset simulated.";
-        tripId = Date.now();
+      if (!confirm("Clear all location data and reset ID to 1?")) return;
+
+      db.close();
+      const deleteRequest = indexedDB.deleteDatabase("FastGPS");
+
+      deleteRequest.onsuccess = () => {
+        const reopenRequest = indexedDB.open("FastGPS", 1);
+        reopenRequest.onupgradeneeded = e => {
+          db = e.target.result;
+          db.createObjectStore("locations", { keyPath: "id", autoIncrement: true });
+        };
+        reopenRequest.onsuccess = e => {
+          db = e.target.result;
+          document.getElementById("logTable").innerHTML = "";
+          document.getElementById("status").textContent = "✅ Database cleared. ID will restart from 1.";
+          tripId = Date.now();
+        };
+      };
+
+      deleteRequest.onerror = e => {
+        document.getElementById("status").textContent = "❌ Failed to reset database.";
       };
     }
 
@@ -180,7 +194,7 @@
           });
 
           if (response.ok) {
-            // Update synced field to true
+            // Mark synced true
             const tx2 = db.transaction("locations", "readwrite");
             const store2 = tx2.objectStore("locations");
             allData.forEach(record => {
@@ -188,7 +202,7 @@
             });
 
             document.getElementById("status").textContent = "✅ Data synced successfully to MongoDB.";
-            loadData(); // Refresh table with updated sync status
+            loadData(); // Refresh UI
           } else {
             const errText = await response.text();
             document.getElementById("status").textContent = "❌ Sync failed: " + errText;

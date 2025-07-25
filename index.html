@@ -31,12 +31,12 @@
 </head>
 <body>
 
-  <button onclick="startTracking()">Start</button>
-  <button onclick="stopTracking()">Stop</button>
-  <button onclick="clearData()">Clear Data</button>
-  <button onclick="syncToMongo()">Sync to MongoDB</button>
+  <button id="startBtn" onclick="startTracking()" disabled>Start</button>
+  <button id="stopBtn" onclick="stopTracking()" disabled>Stop</button>
+  <button id="clearBtn" onclick="clearData()" disabled>Clear Data</button>
+  <button id="syncBtn" onclick="syncToMongo()" disabled>Sync to MongoDB</button>
 
-  <div id="status"></div>
+  <div id="status">Initializing database...</div>
 
   <table>
     <thead>
@@ -58,21 +58,37 @@
     let tripId = Date.now();
     const deviceInfo = navigator.userAgent;
 
-    // Open DB
-    const request = indexedDB.open("FastGPS", 1);
-    request.onupgradeneeded = e => {
-      db = e.target.result;
-      if (db.objectStoreNames.contains("locations")) {
-        db.deleteObjectStore("locations");
-      }
-      db.createObjectStore("locations", { keyPath: "id", autoIncrement: true });
-    };
-    request.onsuccess = e => {
-      db = e.target.result;
-      loadData();
-    };
+    function enableButtons(enabled) {
+      document.getElementById("startBtn").disabled = !enabled;
+      document.getElementById("stopBtn").disabled = !enabled;
+      document.getElementById("clearBtn").disabled = !enabled;
+      document.getElementById("syncBtn").disabled = !enabled;
+    }
+
+    function initDatabase() {
+      const request = indexedDB.open("FastGPS", 1);
+      request.onupgradeneeded = e => {
+        db = e.target.result;
+        if (db.objectStoreNames.contains("locations")) {
+          db.deleteObjectStore("locations");
+        }
+        db.createObjectStore("locations", { keyPath: "id", autoIncrement: true });
+      };
+      request.onsuccess = e => {
+        db = e.target.result;
+        document.getElementById("status").textContent = "✅ Database ready.";
+        enableButtons(true);
+        loadData();
+      };
+      request.onerror = () => {
+        document.getElementById("status").textContent = "❌ Failed to initialize DB.";
+      };
+    }
+
+    initDatabase();
 
     function startTracking() {
+      if (!db) return alert("Database not ready yet!");
       if (watchId !== null) return;
 
       watchId = navigator.geolocation.watchPosition(
@@ -80,7 +96,6 @@
           const { latitude, longitude } = pos.coords;
           const timestamp = Date.now();
           saveLocation({ latitude, longitude, timestamp, tripId, deviceInfo, synced: false });
-          document.getElementById('status').textContent = '';
         },
         err => {
           document.getElementById('status').textContent = `GPS error: ${err.message}`;
@@ -106,6 +121,7 @@
     }
 
     function saveLocation(data) {
+      if (!db) return;
       const tx = db.transaction("locations", "readwrite");
       const store = tx.objectStore("locations");
       const request = store.add(data);
@@ -116,6 +132,7 @@
     }
 
     function loadData() {
+      if (!db) return;
       const table = document.getElementById("logTable");
       table.innerHTML = "";
 
@@ -135,7 +152,6 @@
     function appendRow({ id, latitude, longitude, timestamp, tripId, deviceInfo, synced }) {
       const table = document.getElementById("logTable");
       const row = document.createElement("tr");
-
       row.innerHTML = `
         <td>${id}</td>
         <td>${latitude}</td>
@@ -145,36 +161,33 @@
         <td>${deviceInfo}</td>
         <td>${synced}</td>
       `;
-
       table.appendChild(row);
     }
 
     function clearData() {
       if (!confirm("Clear all location data and reset ID to 1?")) return;
+      if (!db) return alert("Database not initialized.");
 
+      enableButtons(false);
       db.close();
       const deleteRequest = indexedDB.deleteDatabase("FastGPS");
 
       deleteRequest.onsuccess = () => {
-        const reopenRequest = indexedDB.open("FastGPS", 1);
-        reopenRequest.onupgradeneeded = e => {
-          db = e.target.result;
-          db.createObjectStore("locations", { keyPath: "id", autoIncrement: true });
-        };
-        reopenRequest.onsuccess = e => {
-          db = e.target.result;
-          document.getElementById("logTable").innerHTML = "";
-          document.getElementById("status").textContent = "✅ Database cleared. ID will restart from 1.";
-          tripId = Date.now();
-        };
+        document.getElementById("logTable").innerHTML = "";
+        document.getElementById("status").textContent = "🧹 Database deleted. Reinitializing...";
+        tripId = Date.now();
+        setTimeout(initDatabase, 300); // Slight delay to avoid race conditions
       };
 
-      deleteRequest.onerror = e => {
-        document.getElementById("status").textContent = "❌ Failed to reset database.";
+      deleteRequest.onerror = () => {
+        document.getElementById("status").textContent = "❌ Failed to delete database.";
+        enableButtons(true);
       };
     }
 
     async function syncToMongo() {
+      if (!db) return;
+
       const tx = db.transaction("locations", "readwrite");
       const store = tx.objectStore("locations");
       const request = store.getAll();
@@ -194,15 +207,14 @@
           });
 
           if (response.ok) {
-            // Mark synced true
             const tx2 = db.transaction("locations", "readwrite");
             const store2 = tx2.objectStore("locations");
             allData.forEach(record => {
               store2.put({ ...record, synced: true });
             });
 
-            document.getElementById("status").textContent = "✅ Data synced successfully to MongoDB.";
-            loadData(); // Refresh UI
+            document.getElementById("status").textContent = "✅ Data synced to MongoDB.";
+            loadData();
           } else {
             const errText = await response.text();
             document.getElementById("status").textContent = "❌ Sync failed: " + errText;

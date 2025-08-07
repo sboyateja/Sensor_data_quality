@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Fast GPS Logger with Device Info</title>
+  <style>
+    body { font-family: sans-serif; margin: 20px; }
+    button {
+      padding: 12px 16px;
+      font-size: 16px;
+      margin: 6px;
+      border-radius: 6px;
+      border: none;
+      background-color: #007BFF;
+      color: white;
+      cursor: pointer;
+    }
+    button:hover { background-color: #0056b3; }
+    #status { margin: 12px 0; color: red; font-weight: bold; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 16px;
+    }
+    th, td {
+      padding: 8px;
+      border: 1px solid #ccc;
+      font-size: 14px;
+    }
+    input[type="text"] {
+      width: 100%;
+      padding: 5px;
+      font-size: 14px;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+    }
+  </style>
+</head>
+<body>
+
+  <button id="startBtn" onclick="startTracking()" disabled>Start</button>
+  <button id="stopBtn" onclick="stopTracking()" disabled>Stop</button>
+  <button id="clearBtn" onclick="clearData()" disabled>Clear Data</button>
+  <button id="syncBtn" onclick="syncToMongo()" disabled>Sync to MongoDB</button>
+
+  <div id="status">Initializing database...</div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Lat</th>
+        <th>Lng</th>
+        <th>Time</th>
+        <th>Trip ID</th>
+        <th>Device Info</th>
+        <th>Synced</th>
+        <th>Notes</th>
+      </tr>
+    </thead>
+    <tbody id="logTable"></tbody>
+  </table>
+
+  <script>
+    let db, watchId = null;
+    let tripId = Date.now();
+    const deviceInfo = navigator.userAgent;
+
+    function enableButtons(enabled) {
+      document.getElementById("startBtn").disabled = !enabled;
+      document.getElementById("stopBtn").disabled = !enabled;
+      document.getElementById("clearBtn").disabled = !enabled;
+      document.getElementById("syncBtn").disabled = !enabled;
+    }
+
+    function initDatabase() {
+      const request = indexedDB.open("FastGPS", 1);
+      request.onupgradeneeded = e => {
+        db = e.target.result;
+        if (db.objectStoreNames.contains("locations")) {
+          db.deleteObjectStore("locations");
+        }
+        const store = db.createObjectStore("locations", { keyPath: "id", autoIncrement: true });
+        store.createIndex("tripId", "tripId", { unique: false });
+      };
+      request.onsuccess = e => {
+        db = e.target.result;
+        document.getElementById("status").textContent = "✅ Database ready.";
+        enableButtons(true);
+        loadData();
+      };
+      request.onerror = () => {
+        document.getElementById("status").textContent = "❌ Failed to initialize DB.";
+      };
+    }
+
+    initDatabase();
+
+    function startTracking() {
+      if (!db) return alert("Database not ready yet!");
+      if (watchId !== null) return;
+
+      watchId = navigator.geolocation.watchPosition(
+        pos => {
+          const { latitude, longitude } = pos.coords;
+          const timestamp = Date.now();
+          saveLocation({ latitude, longitude, timestamp, tripId, deviceInfo, synced: false });
+        },
+        err => {
+          document.getElementById('status').textContent = `GPS error: ${err.message}`;
+          setTimeout(() => {
+            stopTracking(false);
+            startTracking();
+          }, 2000);
+        },
+        {
+          enableHighAccuracy: true,
+          maximumAge: 0,
+          timeout: 10000
+        }
+      );
+    }
+
+    function stopTracking(reset = true) {
+      if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+        watchId = null;
+        if (reset) tripId = Date.now();
+      }
+    }
+
+    function saveLocation(data) {
+      if (!db) return;
+      const tx = db.transaction("locations", "readwrite");
+      const store = tx.objectStore("locations");
+
+      const request = store.add({ ...data, notes: "" });
+      request.onsuccess = e => {
+        const id = e.target.result;
+        appendRow({ id, ...data, notes: "" });
+      };
+    }
+
+    function loadData() {
+      if (!db) return;
+      const table = document.getElementById("logTable");
+      table.innerHTML = "";
+
+      const tx = db.transaction("locations", "readonly");
+      const store = tx.objectStore("locations");
+      const request = store.openCursor();
+
+      request.onsuccess = e => {
+        const cursor = e.target.result;
+        if (cursor) {
+          appendRow({ id: cursor.key, ...cursor.value });
+          cursor.continue();
+        }
+      };
+    }
+
+    function appendRow({ id, latitude, longitude, timestamp, tripId, deviceInfo, synced, notes = "" }) {
+      const table = document.getElementById("logTable");
+      const row = document.createElement("tr");
+
+      row.innerHTML = `
+        <td>${id}</td>
+        <td>${latitude}</td>
+        <td>${longitude}</td>
+        <td>${new Date(timestamp).toLocaleString()}</td>
+        <td>${tripId}</td>
+        <td>${deviceInfo}</td>
+        <td>${synced}</td>
+        <td><input type="text" value="${notes}" oninput="updateNote(${id}, this.value)" /></td>
+      `;
+
+      table.appendChild(row);
+    }
+
+    function updateNote(id, newNote) {
+      if (!db) return;
+      const tx = db.transaction("locations", "readwrite");
+      const store = tx.objectStore("locations");
+      const getRequest = store.get(id);
+
+      getRequest.onsuccess = e => {
+        const data = e.target.result;
+        if (data) {
+          data.notes = newNote;
+          store.put(data);
+        }
+      };
+    }
+
+    function clearData() {
+      if (!confirm("Clear all location data and reset ID to 1?")) return;
+      if (!db) return alert("Database not initialized.");
+
+      enableButtons(false);
+      db.close();
+      const deleteRequest = indexedDB.deleteDatabase("FastGPS");
+
+      deleteRequest.onsuccess = () => {
+        document.getElementById("logTable").innerHTML = "";
+        document.getElementById("status").textContent = "🧹 Database deleted. Reinitializing...";
+        tripId = Date.now();
+        setTimeout(initDatabase, 300); // Slight delay to avoid race conditions
+      };
+
+      deleteRequest.onerror = () => {
+        document.getElementById("status").textContent = "❌ Failed to delete database.";
+        enableButtons(true);
+      };
+    }
+
+    async function syncToMongo() {
+      if (!db) return;
+
+      const tx = db.transaction("locations", "readwrite");
+      const store = tx.objectStore("locations");
+      const request = store.getAll();
+
+      request.onsuccess = async () => {
+        const allData = request.result;
+        if (!allData.length) {
+          document.getElementById("status").textContent = "No data to sync.";
+          return;
+        }
+
+        try {
+          const response = await fetch("https://sensor1-b6ox.onrender.com/mongodb/post", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(allData)
+          });
+
+          if (response.ok) {
+            const tx2 = db.transaction("locations", "readwrite");
+            const store2 = tx2.objectStore("locations");
+            allData.forEach(record => {
+              store2.put({ ...record, synced: true });
+            });
+
+            document.getElementById("status").textContent = "✅ Data synced to MongoDB.";
+            loadData();
+          } else {
+            const errText = await response.text();
+            document.getElementById("status").textContent = "❌ Sync failed: " + errText;
+          }
+        } catch (err) {
+          document.getElementById("status").textContent = "❌ Sync error: " + err.message;
+        }
+      };
+    }
+  </script>
+</body>
+</html>

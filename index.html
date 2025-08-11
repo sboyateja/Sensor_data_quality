@@ -127,8 +127,10 @@
         navigator.geolocation.clearWatch(watchId);
         watchId = null;
 
-        // Apply last note to all points in current trip
-        if (lastNote.trim()) {
+        // Ask for note when stopping
+        let noteFromUser = prompt("Enter note for this trip:", lastNote || "");
+        if (noteFromUser !== null) {
+          lastNote = noteFromUser;
           const tx = db.transaction("locations", "readwrite");
           const store = tx.objectStore("locations");
           const index = store.index("tripId");

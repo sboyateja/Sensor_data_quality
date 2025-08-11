@@ -65,6 +65,7 @@
     let db, watchId = null;
     let tripId = Date.now();
     const deviceInfo = navigator.userAgent;
+    let lastNote = ""; // Remember last note for trip
 
     function enableButtons(enabled) {
       document.getElementById("startBtn").disabled = !enabled;
@@ -104,7 +105,7 @@
         pos => {
           const { latitude, longitude } = pos.coords;
           const timestamp = Date.now();
-          saveLocation({ latitude, longitude, timestamp, tripId, deviceInfo, synced: false });
+          saveLocation({ latitude, longitude, timestamp, tripId, deviceInfo, synced: false, notes: lastNote });
         },
         err => {
           document.getElementById('status').textContent = `GPS error: ${err.message}`;
@@ -125,7 +126,27 @@
       if (watchId !== null) {
         navigator.geolocation.clearWatch(watchId);
         watchId = null;
+
+        // Apply last note to all points in current trip
+        if (lastNote.trim()) {
+          const tx = db.transaction("locations", "readwrite");
+          const store = tx.objectStore("locations");
+          const index = store.index("tripId");
+          const request = index.openCursor(IDBKeyRange.only(tripId));
+
+          request.onsuccess = e => {
+            const cursor = e.target.result;
+            if (cursor) {
+              let data = cursor.value;
+              data.notes = lastNote;
+              cursor.update(data);
+              cursor.continue();
+            }
+          };
+        }
+
         if (reset) tripId = Date.now();
+        setTimeout(loadData, 300); // Refresh table after updating notes
       }
     }
 
@@ -134,10 +155,10 @@
       const tx = db.transaction("locations", "readwrite");
       const store = tx.objectStore("locations");
 
-      const request = store.add({ ...data, notes: "" });
+      const request = store.add(data);
       request.onsuccess = e => {
         const id = e.target.result;
-        appendRow({ id, ...data, notes: "" });
+        appendRow({ id, ...data });
       };
     }
 
@@ -178,6 +199,8 @@
     }
 
     function updateNote(id, newNote) {
+      lastNote = newNote; // remember for trip
+
       if (!db) return;
       const tx = db.transaction("locations", "readwrite");
       const store = tx.objectStore("locations");
@@ -204,7 +227,8 @@
         document.getElementById("logTable").innerHTML = "";
         document.getElementById("status").textContent = "🧹 Database deleted. Reinitializing...";
         tripId = Date.now();
-        setTimeout(initDatabase, 300); // Slight delay to avoid race conditions
+        lastNote = "";
+        setTimeout(initDatabase, 300);
       };
 
       deleteRequest.onerror = () => {
